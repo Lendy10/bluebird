@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: myrepo/bluebird-app
+  repository: myrepo/bluebird-backend
   tag: latest
   pullPolicy: IfNotPresent
 

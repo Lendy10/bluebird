@@ -1,0 +1,129 @@
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY = "docker.io"
+        IMAGE_NAME = "bluebird-go-app"
+        IMAGE_TAG = "build-${env.BUILD_ID}"
+        SCAN_RESULT_DIR = "scan-reports"
+        SBOM_OUTPUT = "sbom-${env.BUILD_ID}.json"
+        GOPATH = "$WORKSPACE/go"
+        GO111MODULE = "on"
+    }
+
+    stages {
+        stage('Checkout Source Code') {
+            steps {
+                echo "🔍 Fetching latest code from Git repository..."
+                checkout scm
+                sh 'git log -1 --oneline' // Verify latest commit
+            }
+        }
+
+        stage('Unit Test & Coverage') {
+            steps {
+                echo "🧪 Running Golang unit tests with coverage..."
+                sh '''
+                mkdir -p test-reports
+                go test -v ./... -coverprofile=test-reports/coverage.out > test-reports/unit-test.log || exit 1
+                go tool cover -func=test-reports/coverage.out
+                '''
+                archiveArtifacts artifacts: 'test-reports/*', fingerprint: true
+            }
+        }
+
+        stage('Build Go Application') {
+            steps {
+                echo "🔨 Building Go binary..."
+                sh '''
+                go mod tidy
+                go build -o app ./cmd/main.go
+                '''
+                archiveArtifacts artifacts: 'app', fingerprint: true
+            }
+        }
+
+        stage('Build & Push Docker Image') {
+            steps {
+                echo "📦 Packaging application into Docker image..."
+                sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ."
+
+                echo "🚀 Pushing Docker image to registry..."
+                withDockerRegistry([credentialsId: 'docker-credentials', url: "https://${REGISTRY}"]) {
+                    sh "docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Kubernetes Linting (kube-linter)') {
+            steps {
+                echo "🔍 Running kube-linter to check Kubernetes manifests..."
+                sh '''
+                docker run --rm -v $(pwd)/k8s:/manifests stackrox/kube-linter lint /manifests > kube-linter-report.txt || true
+                '''
+                archiveArtifacts artifacts: 'kube-linter-report.txt', fingerprint: true
+            }
+        }
+
+        stage('Static Code Analysis (golangci-lint)') {
+            steps {
+                echo "🔍 Running GolangCI-Lint for static code analysis..."
+                sh '''
+                docker run --rm -v $(pwd):/app -w /app golangci/golangci-lint golangci-lint run ./... --timeout 5m > lint-report.txt || true
+                '''
+                archiveArtifacts artifacts: 'lint-report.txt', fingerprint: true
+            }
+        }
+
+        stage('OWASP ZAP Security Scan') {
+            steps {
+                echo "🔒 Running OWASP ZAP security scan..."
+                sh '''
+                docker run --rm -v $(pwd):/zap/wrk owasp/zap2docker-stable zap-baseline.py \
+                -t http://staging.example.com -r zap-report.html
+                '''
+                archiveArtifacts artifacts: 'zap-report.html', fingerprint: true
+            }
+        }
+
+        stage('Security Scan - Container & Dependencies') {
+            steps {
+                echo "🛡️ Running security scan on container image using Trivy..."
+                sh "mkdir -p ${SCAN_RESULT_DIR}"
+                sh "docker run --rm -v $(pwd)/${SCAN_RESULT_DIR}:/results aquasec/trivy image \
+                --format json --output /results/trivy-${IMAGE_TAG}.json ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                archiveArtifacts artifacts: "${SCAN_RESULT_DIR}/trivy-${IMAGE_TAG}.json", fingerprint: true
+            }
+        }
+
+        stage('Generate SBOM (Software Bill of Materials)') {
+            steps {
+                echo "📦 Generating SBOM for dependency tracking..."
+                sh '''
+                docker run --rm -v $(pwd):/src anchore/syft ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -o json > ${SBOM_OUTPUT}
+                '''
+                archiveArtifacts artifacts: "${SBOM_OUTPUT}", fingerprint: true
+            }
+        }
+
+        stage('Deployment to Kubernetes') {
+            steps {
+                echo "🚀 Deploying ${IMAGE_NAME}:${IMAGE_TAG} to Kubernetes..."
+                sh '''
+                kubectl set image deployment/bluebird-go-app bluebird-go-app=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} --record
+                kubectl rollout status deployment/bluebird-go-app
+                '''
+                echo "✅ Deployment successful! New version running in the cluster."
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 Pipeline execution successful! Image: ${IMAGE_NAME}:${IMAGE_TAG} deployed."
+        }
+        failure {
+            echo "❌ Pipeline failed! Investigate the errors above."
+        }
+    }
+}
