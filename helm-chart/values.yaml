@@ -1,0 +1,31 @@
+replicaCount: 2
+
+image:
+  repository: myrepo/bluebird-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+
+deployment:
+  enabled: true
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 75
+
+ingress:
+  enabled: true
+  host: bluebird.local
+  path: /
+
+configmap:
+  enabled: true
+  data:
+    APP_ENV: production
+    LOG_LEVEL: info
