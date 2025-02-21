@@ -1,4 +1,4 @@
-# **Bluebird Go App - CI/CD Pipeline using Jenkins**
+# 🚀 **Bluebird Go App - CI/CD Pipeline using Jenkins**
 
 This repository contains a **Jenkins CI/CD pipeline** designed for a **Golang-based application**. The pipeline automates the entire software delivery lifecycle, ensuring that the application is tested, secured, built, and deployed efficiently.
 
