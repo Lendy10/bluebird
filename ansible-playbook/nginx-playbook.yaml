@@ -1,0 +1,46 @@
+- name: Setup webserver
+  hosts: webserver
+  tasks:
+    - name: Update APT
+      ansible.builtin.apt:
+        update_cache: yes
+      become: yes
+
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+      become: yes
+
+    - name: create a directory
+      ansible.builtin.file:
+        path: /var/www/{{domain}}
+        state: directory
+        mode: "0755"
+        owner: "{{ansible_user}}"
+        group: "{{ansible_user}}"
+      become: yes
+
+    - name: delete nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      become: yes
+      notify: Restart nginx
+
+    - name: copy nginx site
+      ansible.builtin.template:
+        src: site.conf.j2
+        dest: /etc/nginx/sites-enabled/{{ domain }}
+        owner: root
+        group: root
+        mode: "0644"
+      become: yes
+      notify: Restart nginx
+
+  handlers:
+    - name: Restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+      become: yes

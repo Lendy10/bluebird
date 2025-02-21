@@ -1,0 +1,7 @@
+[webserver]
+xx.xx.xx.xx ansible_user=bluebird ansible_ssh_private_key_file=~/.ssh/id_rsa
+# IP addresses of the server here
+
+[all:vars]
+ansible_user=bluebird
+# dont use root user

@@ -22,6 +22,14 @@ variable "key_name" {
   type = string
 }
 
+variable "security_group_id" {
+  type = string
+}
+
+variable "public_asset_bool" {
+  type = bool
+}
+
 variable "name" {
   type = string
 }

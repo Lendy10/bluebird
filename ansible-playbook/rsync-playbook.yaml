@@ -1,0 +1,11 @@
+- name: Rsync file ke server
+  hosts: webserver
+  tasks:
+    - name: Rsync my file
+      ansible.posix.synchronize:
+        src: site/
+        dest: /var/www/{{ domain }}
+        checksum: yes
+        recursive: yes
+        delete: yes
+      become: yes
