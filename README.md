@@ -6,7 +6,7 @@ This repository contains infrastructure-as-code (IaC) and automation scripts for
 
 ```
 .
-├── iac_terraform_aws/      # Reusable Terraform modules for cloud resources
+├── iac_terraform/      # Reusable Terraform modules for cloud resources
 ├── ansible-playbook/      # Ansible playbooks for server provisioning and configuration
 ├── helm-chart/            # Helm charts for Kubernetes application deployment
 └── jenkins-cicd/         # Jenkins pipelines for CI/CD automation
